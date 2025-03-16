@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { type User, type Analysis } from "@shared/schema";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, User as UserIcon, Calendar, Star, Camera } from "lucide-react";
 
 export default function Profile() {
   const userQuery = useQuery<User>({
@@ -48,89 +48,109 @@ export default function Profile() {
   const analyses = analysesQuery.data || [];
 
   return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+      <div className="container mx-auto px-4 py-16">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold mb-8">Your Beauty Profile</h1>
 
-        {/* User Info */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground">Name</h3>
-                <p className="text-lg">{name}</p>
+          {/* User Info */}
+          <Card className="mb-8 overflow-hidden">
+            <CardHeader className="bg-primary/5 pb-6">
+              <div className="flex items-center space-x-4">
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UserIcon className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold">{name}</h2>
+                  <p className="text-muted-foreground">{email}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground">Email</h3>
-                <p className="text-lg">{email}</p>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>Member since {format(new Date(createdAt), 'MMMM d, yyyy')}</span>
               </div>
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground">Member Since</h3>
-                <p className="text-lg">{format(new Date(createdAt), 'MMMM d, yyyy')}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Separator className="my-8" />
+          <Separator className="my-8" />
 
-        {/* Analysis History */}
-        <div>
-          <h2 className="text-2xl font-semibold mb-6">Analysis History</h2>
-          {analyses.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">
-                  You haven't done any beauty analysis yet.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              {analyses.map((analysis) => (
-                <Card key={analysis.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="h-12 w-12 rounded-full overflow-hidden">
-                          <img
-                            src={analysis.imageUrl}
-                            alt="Analysis"
-                            className="h-full w-full object-cover"
-                          />
+          {/* Analysis History */}
+          <div>
+            <h2 className="text-2xl font-semibold mb-6">Beauty Analysis History</h2>
+            {analyses.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    You haven't done any beauty analysis yet.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                {analyses.map((analysis) => (
+                  <Card key={analysis.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="h-12 w-12 rounded-full overflow-hidden">
+                            <img
+                              src={analysis.imageUrl}
+                              alt="Analysis"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              {format(new Date(analysis.createdAt), 'MMMM d, yyyy')}
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <Star className="h-4 w-4 text-primary" />
+                              <p className="font-medium">Skin Type: {analysis.skinType}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <Link href={`/analysis/${analysis.id}`}>
+                          <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+                            View Details
+                          </Badge>
+                        </Link>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-sm font-medium mb-2">Key Concerns</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {analysis.concerns.map((concern, i) => (
+                              <Badge key={i} variant="outline">
+                                {concern}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(analysis.createdAt), 'MMMM d, yyyy')}
-                          </p>
-                          <p className="font-medium">Skin Type: {analysis.skinType}</p>
+                          <h4 className="text-sm font-medium mb-2">Recommended Products</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {analysis.recommendations.slice(0, 3).map((rec, i) => (
+                              <Badge key={i} variant="secondary">
+                                {rec.productType}
+                              </Badge>
+                            ))}
+                            {analysis.recommendations.length > 3 && (
+                              <Badge variant="secondary">+{analysis.recommendations.length - 3} more</Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <Link href={`/analysis/${analysis.id}`}>
-                        <Badge variant="secondary" className="cursor-pointer">
-                          View Details
-                        </Badge>
-                      </Link>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-sm font-medium mb-2">Key Concerns</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {analysis.concerns.map((concern, i) => (
-                            <Badge key={i} variant="outline">
-                              {concern}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
