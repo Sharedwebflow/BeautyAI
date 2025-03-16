@@ -2,9 +2,13 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeFacialFeatures } from "./lib/openai";
-import { insertAnalysisSchema, insertUserSchema } from "@shared/schema";
+import { insertAnalysisSchema } from "@shared/schema";
+import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication routes and middleware
+  setupAuth(app);
+
   // User routes
   app.post("/api/user", async (req, res) => {
     try {
@@ -25,30 +29,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/user/me", async (req, res) => {
-    try {
-      // TODO: Replace with actual user ID from session
-      const user = await storage.getUser(1);
-      if (!user) {
-        res.status(401).json({ message: "Not authenticated" });
-        return;
-      }
-      res.json(user);
-    } catch (error: unknown) {
-      const err = error as Error;
-      res.status(500).json({ message: err.message });
+  // Get current user
+  app.get("/api/user/me", (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
     }
+    res.json(req.user);
   });
 
-  app.get("/api/user/analyses", async (req, res) => {
-    try {
-      // TODO: Replace with actual user ID from session
-      const analyses = await storage.getUserAnalyses(1);
-      res.json(analyses);
-    } catch (error: unknown) {
-      const err = error as Error;
-      res.status(500).json({ message: err.message });
+  // Get user's analyses
+  app.get("/api/user/analyses", (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
     }
+    storage.getUserAnalyses(req.user.id)
+      .then(analyses => res.json(analyses))
+      .catch(err => res.status(500).json({ message: err.message }));
   });
 
   // Product routes
@@ -83,6 +79,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/analyze", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     try {
       const { image } = req.body;
       if (!image) {
@@ -92,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const analysis = await analyzeFacialFeatures(image);
       const validatedAnalysis = insertAnalysisSchema.parse({
-        userId: 1, // TODO: Replace with actual user ID from session
+        userId: req.user.id,
         imageUrl: `data:image/jpeg;base64,${image}`,
         features: analysis.features,
         skinType: analysis.skinType,
