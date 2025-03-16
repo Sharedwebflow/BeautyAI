@@ -1,6 +1,13 @@
-import { pgTable, text, serial, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -17,18 +24,23 @@ export const products = pgTable("products", {
 
 export const analyses = pgTable("analyses", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
   imageUrl: text("image_url").notNull(),
   features: jsonb("features").notNull(),
   skinType: text("skin_type").notNull(),
   concerns: text("concerns").array().notNull(),
   recommendations: jsonb("recommendations").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true });
-export const insertAnalysisSchema = createInsertSchema(analyses).omit({ id: true });
+export const insertAnalysisSchema = createInsertSchema(analyses).omit({ id: true, createdAt: true });
 
+export type User = typeof users.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type Analysis = typeof analyses.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type InsertAnalysis = z.infer<typeof insertAnalysisSchema>;
 

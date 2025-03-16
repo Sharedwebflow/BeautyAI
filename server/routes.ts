@@ -1,10 +1,57 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { analyzeFacialFeatures } from "./lib/gemini";
-import { insertAnalysisSchema } from "@shared/schema";
+import { analyzeFacialFeatures } from "./lib/openai";
+import { insertAnalysisSchema, insertUserSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // User routes
+  app.post("/api/user", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(userData.email);
+      if (existingUser) {
+        res.status(400).json({ message: "User already exists" });
+        return;
+      }
+
+      const user = await storage.createUser(userData);
+      res.json(user);
+    } catch (error: unknown) {
+      const err = error as Error;
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/user/me", async (req, res) => {
+    try {
+      // TODO: Replace with actual user ID from session
+      const user = await storage.getUser(1);
+      if (!user) {
+        res.status(401).json({ message: "Not authenticated" });
+        return;
+      }
+      res.json(user);
+    } catch (error: unknown) {
+      const err = error as Error;
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/user/analyses", async (req, res) => {
+    try {
+      // TODO: Replace with actual user ID from session
+      const analyses = await storage.getUserAnalyses(1);
+      res.json(analyses);
+    } catch (error: unknown) {
+      const err = error as Error;
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Product routes
   app.get("/api/products", async (_req, res) => {
     const products = await storage.getProducts();
     res.json(products);
@@ -45,6 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const analysis = await analyzeFacialFeatures(image);
       const validatedAnalysis = insertAnalysisSchema.parse({
+        userId: 1, // TODO: Replace with actual user ID from session
         imageUrl: `data:image/jpeg;base64,${image}`,
         features: analysis.features,
         skinType: analysis.skinType,
