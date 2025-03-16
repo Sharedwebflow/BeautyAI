@@ -10,11 +10,18 @@ export interface FacialAnalysis {
     eyes: string;
     lips: string;
     cheeks: string;
-    general: string;
+    jawline: string;
+    forehead: string;
+    noseShape: string;
+    skinTexture: string;
+    symmetry: string;
   };
   recommendations: {
     category: string;
+    productType: string;
     reason: string;
+    priority: number;
+    ingredients: string[];
   }[];
 }
 
@@ -25,14 +32,18 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
       messages: [
         {
           role: "system",
-          content: "You are a professional beauty advisor. Analyze the facial features and provide beauty product recommendations. Respond with detailed JSON."
+          content: `You are a professional beauty advisor and dermatologist with expertise in facial analysis and skincare.
+          Analyze facial features in detail and provide comprehensive beauty recommendations.
+          Consider skin type, texture, symmetry, and specific facial features.
+          Provide specific product recommendations with ingredient suggestions.
+          Format the response as a detailed JSON object.`
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Analyze this person's facial features and recommend beauty products. Include skin type, concerns, and specific product recommendations."
+              text: "Please provide a detailed analysis of this person's facial features and beauty characteristics. Include skin type, concerns, detailed feature analysis, and specific product recommendations with ingredients."
             },
             {
               type: "image_url",
@@ -46,8 +57,10 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
       response_format: { type: "json_object" }
     });
 
-    return JSON.parse(response.choices[0].message.content);
+    const result = JSON.parse(response.choices[0].message.content || '{}');
+    return result as FacialAnalysis;
   } catch (error) {
-    throw new Error(`Failed to analyze facial features: ${error.message}`);
+    const err = error as Error;
+    throw new Error(`Failed to analyze facial features: ${err.message}`);
   }
 }
