@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { analyzeFacialFeatures } from "./lib/openai";
+import { analyzeFacialFeatures } from "./lib/gemini";
 import { insertAnalysisSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -36,8 +36,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const savedAnalysis = await storage.createAnalysis(validatedAnalysis);
       res.json(savedAnalysis);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      const err = error as Error;
+      res.status(500).json({ message: err.message });
     }
   });
 
