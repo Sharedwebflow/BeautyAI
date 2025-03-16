@@ -19,6 +19,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(product);
   });
 
+  app.get("/api/analysis/:id/recommendations", async (req, res) => {
+    try {
+      const analysis = await storage.getAnalysis(Number(req.params.id));
+      if (!analysis) {
+        res.status(404).json({ message: "Analysis not found" });
+        return;
+      }
+
+      const recommendedProducts = await storage.getRecommendedProducts(analysis);
+      res.json(recommendedProducts);
+    } catch (error: unknown) {
+      const err = error as Error;
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/analyze", async (req, res) => {
     try {
       const { image } = req.body;
@@ -31,6 +47,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedAnalysis = insertAnalysisSchema.parse({
         imageUrl: `data:image/jpeg;base64,${image}`,
         features: analysis.features,
+        skinType: analysis.skinType,
+        concerns: analysis.concerns,
         recommendations: analysis.recommendations
       });
 

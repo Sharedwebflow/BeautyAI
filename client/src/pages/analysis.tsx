@@ -16,7 +16,8 @@ export default function Analysis() {
   });
 
   const productsQuery = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/analysis", id, "recommendations"],
+    enabled: !!analysisQuery.data
   });
 
   if (analysisQuery.isLoading || productsQuery.isLoading) {
@@ -104,7 +105,17 @@ export default function Analysis() {
             <h2 className="text-xl font-semibold mb-6">Available Products</h2>
             <div className="grid sm:grid-cols-2 gap-6">
               {productsQuery.data.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <div key={product.id} className="relative">
+                  <ProductCard product={product} />
+                  {product.matchScore !== null && (
+                    <Badge
+                      className="absolute top-2 right-2"
+                      variant="secondary"
+                    >
+                      {product.matchScore}% Match
+                    </Badge>
+                  )}
+                </div>
               ))}
             </div>
           </div>
