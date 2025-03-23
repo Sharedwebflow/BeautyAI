@@ -21,16 +21,15 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const startCamera = async () => {
     setIsInitializingCamera(true);
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera access not supported in this browser");
+      // First check if the browser supports getUserMedia
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera API not supported");
       }
 
-      // Explicitly request camera permissions with macOS/Safari compatible constraints
+      // Request camera access
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "user",
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 }
+          facingMode: "user"
         },
         audio: false
       });
@@ -40,37 +39,36 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       }
 
       videoRef.current.srcObject = stream;
-
-      // Wait for video to be ready
-      await new Promise<void>((resolve, reject) => {
-        if (!videoRef.current) return reject();
-        videoRef.current.onloadedmetadata = () => resolve();
-        videoRef.current.onerror = () => reject();
-      });
-
+      await videoRef.current.play();
       setIsCapturing(true);
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      let errorMessage = "Unable to access camera. ";
 
+    } catch (err) {
+      console.error("Camera error:", err);
+
+      let message = "Camera access failed. ";
       if (err instanceof Error) {
-        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          errorMessage += "Please allow camera access in your browser settings and try again.";
+        if (err.name === "NotAllowedError") {
+          message += "Please allow camera access in your browser settings.";
+          // On macOS Safari/Chrome, guide users to System Preferences
+          if (navigator.userAgent.includes("Mac")) {
+            message += " Go to System Settings → Privacy & Security → Camera";
+          }
         } else if (err.name === "NotFoundError") {
-          errorMessage += "No camera found on your device.";
+          message += "No camera detected on your device.";
+        } else if (err.name === "NotReadableError") {
+          message += "Your camera might be in use by another application.";
         } else {
-          errorMessage += "Please check your camera permissions and try again.";
+          message += err.message;
         }
       }
 
       toast({
-        title: "Camera Access Error",
-        description: errorMessage,
+        title: "Camera Error",
+        description: message,
         variant: "destructive",
       });
-    } finally {
-      setIsInitializingCamera(false);
     }
+    setIsInitializingCamera(false);
   };
 
   const stopCamera = useCallback(() => {
@@ -93,11 +91,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
 
     const context = canvas.getContext('2d');
     if (context) {
-      // Mirror effect for selfie
-      context.translate(canvas.width, 0);
-      context.scale(-1, 1);
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
       const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
       onChange(base64);
       stopCamera();
@@ -148,7 +142,6 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
             autoPlay
             playsInline
             muted
-            style={{ transform: 'scaleX(-1)' }}
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
