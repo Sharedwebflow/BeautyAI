@@ -28,14 +28,14 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
   try {
     console.log('Initializing Gemini model');
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro-vision",
+      model: "gemini-pro-vision",
       generationConfig: {
         temperature: 0.4,
         maxOutputTokens: 1024,
       }
     });
 
-    const prompt = `As a dermatologist, analyze this facial image and provide a detailed skin assessment.
+    const prompt = `Analyze this facial image and provide a detailed skin assessment.
 Return ONLY a JSON object with NO additional text, following this EXACT format:
 
 {
@@ -62,22 +62,17 @@ Return ONLY a JSON object with NO additional text, following this EXACT format:
   ]
 }`;
 
-    console.log('Sending request to Gemini API');
-    const result = await model.generateContent([
-      {
-        role: "user",
-        parts: [
-          {
-            text: prompt
-          },
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: base64Image
-            }
-          }
-        ]
+    console.log('Preparing Gemini API request');
+    const imageData = {
+      inlineData: {
+        data: base64Image,
+        mimeType: "image/jpeg"
       }
+    };
+
+    const result = await model.generateContent([
+      prompt,
+      imageData
     ]);
 
     const response = await result.response;
