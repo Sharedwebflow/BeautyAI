@@ -26,11 +26,9 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         throw new Error("Camera API not supported");
       }
 
-      // Request camera access
+      // Request camera access with minimal constraints
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user"
-        },
+        video: true,
         audio: false
       });
 
@@ -39,24 +37,27 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       }
 
       videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-      setIsCapturing(true);
+      videoRef.current.onloadedmetadata = () => {
+        if (videoRef.current) {
+          videoRef.current.play()
+            .then(() => setIsCapturing(true))
+            .catch(err => {
+              console.error("Failed to play video:", err);
+              throw err;
+            });
+        }
+      };
 
     } catch (err) {
       console.error("Camera error:", err);
-
-      let message = "Camera access failed. ";
+      let message = "Failed to access camera. ";
       if (err instanceof Error) {
         if (err.name === "NotAllowedError") {
-          message += "Please allow camera access in your browser settings.";
-          // On macOS Safari/Chrome, guide users to System Preferences
-          if (navigator.userAgent.includes("Mac")) {
-            message += " Go to System Settings → Privacy & Security → Camera";
-          }
+          message = "Please allow camera access in your browser settings. If using Safari, check System Settings → Privacy & Security → Camera";
         } else if (err.name === "NotFoundError") {
-          message += "No camera detected on your device.";
+          message = "No camera detected on your device.";
         } else if (err.name === "NotReadableError") {
-          message += "Your camera might be in use by another application.";
+          message = "Your camera might be in use by another application.";
         } else {
           message += err.message;
         }
@@ -67,6 +68,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         description: message,
         variant: "destructive",
       });
+      setIsCapturing(false);
     }
     setIsInitializingCamera(false);
   };
@@ -86,16 +88,24 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Get the actual video dimensions
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+
+    // Set canvas size to match video
+    canvas.width = videoWidth;
+    canvas.height = videoHeight;
 
     const context = canvas.getContext('2d');
-    if (context) {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-      onChange(base64);
-      stopCamera();
-    }
+    if (!context) return;
+
+    // Draw the video frame to the canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert to base64 and extract the data
+    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    onChange(base64);
+    stopCamera();
   };
 
   const onDrop = useCallback(
@@ -119,7 +129,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       "image/*": [".jpeg", ".jpg", ".png"],
     },
     maxFiles: 1,
-    disabled: isCapturing,
+    disabled: isCapturing || isInitializingCamera,
   });
 
   // Cleanup camera on unmount
@@ -136,7 +146,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     >
       <input {...getInputProps()} />
       {isCapturing ? (
-        <div className="relative aspect-video">
+        <div className="relative aspect-[4/3]">
           <video
             ref={videoRef}
             autoPlay
@@ -167,7 +177,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
           <canvas ref={canvasRef} className="hidden" />
         </div>
       ) : value ? (
-        <div className="relative aspect-square">
+        <div className="relative aspect-[4/3]">
           <img
             src={`data:image/jpeg;base64,${value}`}
             alt="Preview"
