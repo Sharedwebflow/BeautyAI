@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, UploadIcon, Camera } from "lucide-react";
+import { ImageIcon, UploadIcon, Camera, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ImageUploadProps {
@@ -13,13 +13,18 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
   const startCamera = async () => {
+    setIsInitializingCamera(true);
     try {
-      // Try to get the user's camera
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access not supported in this browser");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: "user",
@@ -30,7 +35,13 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play(); // Explicitly start playing
+        // Wait for the video to be ready
+        await new Promise((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = resolve;
+          }
+        });
+        await videoRef.current.play();
         setIsCapturing(true);
       }
     } catch (err) {
@@ -40,31 +51,31 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         description: "Please make sure you've granted camera permissions and try again.",
         variant: "destructive",
       });
-      setIsCapturing(false);
+    } finally {
+      setIsInitializingCamera(false);
     }
   };
 
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
+  const stopCamera = useCallback(() => {
+    if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
     setIsCapturing(false);
-  };
+  }, []);
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
       const context = canvas.getContext('2d');
       if (context) {
-        // Flip horizontally for selfie view
+        // Mirror effect for selfie
         context.translate(canvas.width, 0);
         context.scale(-1, 1);
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -97,14 +108,15 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       "image/*": [".jpeg", ".jpg", ".png"],
     },
     maxFiles: 1,
+    disabled: isCapturing,
   });
 
-  // Clean up camera on unmount
+  // Cleanup camera on unmount
   useEffect(() => {
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [stopCamera]);
 
   return (
     <Card
@@ -113,13 +125,13 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     >
       <input {...getInputProps()} />
       {isCapturing ? (
-        <div className="relative">
+        <div className="relative aspect-video">
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            style={{ transform: 'scaleX(-1)' }} // Mirror effect for selfie view
+            style={{ transform: 'scaleX(-1)' }}
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
@@ -145,14 +157,23 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
           <canvas ref={canvasRef} className="hidden" />
         </div>
       ) : value ? (
-        <img
-          src={`data:image/jpeg;base64,${value}`}
-          alt="Preview"
-          className="w-full h-full object-cover"
-        />
+        <div className="relative aspect-square">
+          <img
+            src={`data:image/jpeg;base64,${value}`}
+            alt="Preview"
+            className="w-full h-full object-cover"
+          />
+        </div>
       ) : (
         <div className="flex flex-col items-center justify-center p-10 text-center">
-          {isDragActive ? (
+          {isInitializingCamera ? (
+            <div className="flex flex-col items-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Initializing camera...
+              </p>
+            </div>
+          ) : isDragActive ? (
             <UploadIcon className="h-10 w-10 text-muted-foreground mb-4" />
           ) : (
             <div className="space-y-4">
