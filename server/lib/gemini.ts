@@ -35,83 +35,89 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
       }
     });
 
-    const prompt = `Analyze this facial image and provide skin assessment in JSON format. Include ONLY the JSON object with these exact fields:
+    const prompt = `As a dermatologist, analyze this facial image and provide a detailed skin assessment.
+Return ONLY a JSON object with NO additional text, following this EXACT format:
+
 {
   "skinType": "oily/dry/combination/normal",
-  "concerns": ["concern1", "concern2"],
+  "concerns": ["list specific skin concerns"],
   "features": {
-    "moisture": "hydration level",
-    "acne": "breakout description",
-    "darkSpots": "pigmentation details",
-    "pores": "pore description",
-    "wrinkles": "fine line assessment",
-    "texture": "texture description",
-    "redness": "inflammation level",
-    "elasticity": "firmness details"
+    "moisture": "describe hydration level",
+    "acne": "describe breakout severity",
+    "darkSpots": "describe pigmentation",
+    "pores": "describe pore appearance",
+    "wrinkles": "describe fine lines",
+    "texture": "describe skin texture",
+    "redness": "describe inflammation",
+    "elasticity": "describe firmness"
   },
   "recommendations": [
     {
       "category": "skincare",
-      "productType": "product name",
-      "reason": "brief explanation",
+      "productType": "specific product type",
+      "reason": "why needed",
       "priority": 1,
-      "ingredients": ["ingredient1", "ingredient2"]
+      "ingredients": ["key ingredients"]
     }
   ]
 }`;
 
-    console.log('Sending request to Gemini API');
-    const result = await model.generateContent([
-      {
+    const result = await model.generateContent({
+      contents: [{
+        role: "user",
         parts: [
           { text: prompt },
           {
-            inlineData: {
-              mimeType: "image/jpeg",
+            inline_data: {
+              mime_type: "image/jpeg",
               data: base64Image
             }
           }
         ]
-      }
-    ]);
+      }]
+    });
 
     const response = await result.response;
     const text = response.text();
     console.log('Raw response:', text);
 
-    // Clean up the response text
+    // Clean up any markdown formatting
     const cleanText = text.replace(/```json|```/g, '').trim();
-    console.log('Cleaned text:', cleanText);
 
     try {
       const analysisData = JSON.parse(cleanText);
-      console.log('Parsed data:', analysisData);
 
-      // Validate structure
-      if (!analysisData.skinType || !analysisData.concerns || !analysisData.features || !analysisData.recommendations) {
-        throw new Error("Missing required fields in response");
+      // Validate required fields are present
+      const requiredFields = ['skinType', 'concerns', 'features', 'recommendations'];
+      for (const field of requiredFields) {
+        if (!analysisData[field]) {
+          throw new Error(`Missing required field: ${field}`);
+        }
       }
 
       // Validate features
-      const requiredFeatures = ['moisture', 'acne', 'darkSpots', 'pores', 'wrinkles', 'texture', 'redness', 'elasticity'];
+      const requiredFeatures = [
+        'moisture', 'acne', 'darkSpots', 'pores', 
+        'wrinkles', 'texture', 'redness', 'elasticity'
+      ];
       for (const feature of requiredFeatures) {
         if (typeof analysisData.features[feature] !== 'string') {
-          throw new Error(`Missing or invalid feature: ${feature}`);
+          throw new Error(`Invalid or missing feature: ${feature}`);
         }
       }
 
       // Validate recommendations
       if (!Array.isArray(analysisData.recommendations) || analysisData.recommendations.length === 0) {
-        throw new Error("Invalid recommendations format");
+        throw new Error('Recommendations must be a non-empty array');
       }
 
       return analysisData as FacialAnalysis;
     } catch (parseError) {
-      console.error('Parse error:', parseError);
-      throw new Error(`Failed to parse analysis result: ${parseError.message}`);
+      console.error('Failed to parse Gemini response:', parseError);
+      throw new Error('Invalid response format from Gemini API');
     }
   } catch (error) {
     console.error('Gemini API error:', error);
-    throw new Error(`Failed to analyze facial features: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
