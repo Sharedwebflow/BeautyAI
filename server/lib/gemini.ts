@@ -26,21 +26,16 @@ export interface FacialAnalysis {
 
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
-    console.log('Initializing Gemini model');
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-pro-vision",
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1024,
-      }
-    });
+    // Initialize the model
+    const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
 
-    const prompt = `Analyze this facial image and provide a detailed skin assessment.
+    // The prompt that specifies the format we want
+    const prompt = `Analyze this facial image and provide a skin assessment.
 Return ONLY a JSON object with NO additional text, following this EXACT format:
 
 {
   "skinType": "oily/dry/combination/normal",
-  "concerns": ["list specific skin concerns"],
+  "concerns": ["list specific concerns"],
   "features": {
     "moisture": "describe hydration level",
     "acne": "describe breakout severity",
@@ -62,51 +57,32 @@ Return ONLY a JSON object with NO additional text, following this EXACT format:
   ]
 }`;
 
-    console.log('Preparing Gemini API request');
-    const imageData = {
-      inlineData: {
-        data: base64Image,
-        mimeType: "image/jpeg"
-      }
-    };
-
+    // Generate content
     const result = await model.generateContent([
       prompt,
-      imageData
+      {
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: base64Image
+        }
+      }
     ]);
 
+    // Wait for the response
     const response = await result.response;
     const text = response.text();
     console.log('Raw response:', text);
 
-    // Clean up any markdown formatting
-    const cleanText = text.replace(/```json|```/g, '').trim();
-
     try {
-      const analysisData = JSON.parse(cleanText);
+      // Parse the response
+      const analysisData = JSON.parse(text);
 
-      // Validate required fields are present
+      // Validate required fields
       const requiredFields = ['skinType', 'concerns', 'features', 'recommendations'];
       for (const field of requiredFields) {
         if (!analysisData[field]) {
           throw new Error(`Missing required field: ${field}`);
         }
-      }
-
-      // Validate features
-      const requiredFeatures = [
-        'moisture', 'acne', 'darkSpots', 'pores', 
-        'wrinkles', 'texture', 'redness', 'elasticity'
-      ];
-      for (const feature of requiredFeatures) {
-        if (typeof analysisData.features[feature] !== 'string') {
-          throw new Error(`Invalid or missing feature: ${feature}`);
-        }
-      }
-
-      // Validate recommendations
-      if (!Array.isArray(analysisData.recommendations) || analysisData.recommendations.length === 0) {
-        throw new Error('Recommendations must be a non-empty array');
       }
 
       return analysisData as FacialAnalysis;
