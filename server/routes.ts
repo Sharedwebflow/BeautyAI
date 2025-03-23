@@ -51,10 +51,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const validatedAnalysis = insertAnalysisSchema.parse({
             userId: req.user?.id || 1,
             imageUrl: `data:image/jpeg;base64,${image}`,
-            features: analysis.features,
-            skinType: analysis.skinType,
-            concerns: analysis.concerns,
-            recommendations: analysis.recommendations
+            ...analysis
           });
 
           console.log('Saving analysis results...');
@@ -111,15 +108,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const analysis = await storage.getAnalysis(Number(req.params.id));
       if (!analysis) {
-        res.status(404).json({ message: "Analysis not found" });
-        return;
+        return res.status(404).json({ message: "Analysis not found" });
       }
 
       const recommendedProducts = await storage.getRecommendedProducts(analysis);
-      res.json(recommendedProducts);
-    } catch (error: unknown) {
-      const err = error as Error;
-      res.status(500).json({ message: err.message });
+      return res.json(recommendedProducts);
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      return res.status(500).json({ 
+        message: "Failed to fetch product recommendations",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
