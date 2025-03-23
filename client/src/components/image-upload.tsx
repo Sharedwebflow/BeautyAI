@@ -21,41 +21,33 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const startCamera = async () => {
     setIsInitializingCamera(true);
     try {
-      // First check if the browser supports getUserMedia
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Camera API not supported");
-      }
-
-      // Request camera access with minimal constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false
       });
 
+      // Make sure video element exists
       if (!videoRef.current) {
-        throw new Error("Video element not found");
+        throw new Error("Failed to initialize camera view");
       }
 
+      // Set up video stream
       videoRef.current.srcObject = stream;
       videoRef.current.onloadedmetadata = () => {
-        if (videoRef.current) {
-          videoRef.current.play()
-            .then(() => setIsCapturing(true))
-            .catch(err => {
-              console.error("Failed to play video:", err);
-              throw err;
-            });
-        }
+        videoRef.current?.play();
+        setIsCapturing(true);
+        setIsInitializingCamera(false);
       };
 
     } catch (err) {
       console.error("Camera error:", err);
       let message = "Failed to access camera. ";
+
       if (err instanceof Error) {
         if (err.name === "NotAllowedError") {
-          message = "Please allow camera access in your browser settings. If using Safari, check System Settings → Privacy & Security → Camera";
+          message = "Camera access was denied. Please check your browser permissions and try again.";
         } else if (err.name === "NotFoundError") {
-          message = "No camera detected on your device.";
+          message = "No camera found on your device.";
         } else if (err.name === "NotReadableError") {
           message = "Your camera might be in use by another application.";
         } else {
@@ -69,8 +61,8 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         variant: "destructive",
       });
       setIsCapturing(false);
+      setIsInitializingCamera(false);
     }
-    setIsInitializingCamera(false);
   };
 
   const stopCamera = useCallback(() => {
@@ -88,21 +80,17 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    // Get the actual video dimensions
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-
     // Set canvas size to match video
-    canvas.width = videoWidth;
-    canvas.height = videoHeight;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
 
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    // Draw the video frame to the canvas
+    // Capture the frame
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert to base64 and extract the data
+    // Convert to base64
     const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
     onChange(base64);
     stopCamera();
@@ -120,7 +108,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         reader.readAsDataURL(file);
       }
     },
-    [onChange],
+    [onChange]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -146,7 +134,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     >
       <input {...getInputProps()} />
       {isCapturing ? (
-        <div className="relative aspect-[4/3]">
+        <div className="relative min-h-[300px]">
           <video
             ref={videoRef}
             autoPlay
@@ -177,7 +165,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
           <canvas ref={canvasRef} className="hidden" />
         </div>
       ) : value ? (
-        <div className="relative aspect-[4/3]">
+        <div className="relative min-h-[300px]">
           <img
             src={`data:image/jpeg;base64,${value}`}
             alt="Preview"
