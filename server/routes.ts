@@ -1,52 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-// Switch to Gemini for now since OpenAI needs credits
-import { analyzeFacialFeatures } from "./lib/gemini";
+// We'll keep both imports ready, uncomment the one you want to use
+import { analyzeFacialFeatures as analyzeWithGemini } from "./lib/gemini";
+// import { analyzeFacialFeatures as analyzeWithOpenAI } from "./lib/openai";
 import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes and middleware
   setupAuth(app);
-
-  // User routes
-  app.post("/api/user", async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(userData.email);
-      if (existingUser) {
-        res.status(400).json({ message: "User already exists" });
-        return;
-      }
-
-      const user = await storage.createUser(userData);
-      res.json(user);
-    } catch (error: unknown) {
-      const err = error as Error;
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Get current user
-  app.get("/api/user/me", (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    res.json(req.user);
-  });
-
-  // Get user's analyses
-  app.get("/api/user/analyses", (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    storage.getUserAnalyses(req.user.id)
-      .then(analyses => res.json(analyses))
-      .catch(err => res.status(500).json({ message: err.message }));
-  });
 
   // Product routes
   app.get("/api/products", async (_req, res) => {
@@ -80,10 +43,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/analyze", async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
     try {
       const { image } = req.body;
       if (!image) {
@@ -91,9 +50,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const analysis = await analyzeFacialFeatures(image);
+      // Use Gemini by default, switch to OpenAI if preferred
+      const analysis = await analyzeWithGemini(image);
       const validatedAnalysis = insertAnalysisSchema.parse({
-        userId: req.user.id,
+        userId: req.user?.id || 1, // Use default user ID if not logged in
         imageUrl: `data:image/jpeg;base64,${image}`,
         features: analysis.features,
         skinType: analysis.skinType,

@@ -6,14 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import LoadingAnalysis from "@/components/loading-analysis";
 import { Sparkles, Scan, Heart, Star } from "lucide-react";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
   const [image, setImage] = useState<string | null>(null);
 
   const analyzeMutation = useMutation({
@@ -29,23 +27,15 @@ export default function Home() {
       setLocation(`/analysis/${data.id}`);
     },
     onError: (error: Error) => {
-      if (error.message === "Not authenticated") {
-        setLocation("/auth");
-      } else {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
   const handleAnalyze = () => {
-    if (!user) {
-      setLocation("/auth");
-      return;
-    }
     if (image) {
       analyzeMutation.mutate(image);
     }
@@ -80,10 +70,10 @@ export default function Home() {
                 <Button
                   className="w-full mt-4"
                   size="lg"
-                  disabled={!image || !user}
+                  disabled={!image}
                   onClick={handleAnalyze}
                 >
-                  {user ? "Analyze My Features" : "Login to Analyze"}
+                  Analyze My Features
                 </Button>
               </>
             )}
@@ -177,14 +167,10 @@ export default function Home() {
             size="lg"
             className="bg-primary hover:bg-primary/90"
             onClick={() => {
-              if (!user) {
-                setLocation("/auth");
-              } else {
-                document.querySelector('input[type="file"]')?.click();
-              }
+              document.querySelector('input[type="file"]')?.click();
             }}
           >
-            {user ? "Get Started Free" : "Login to Get Started"}
+            Get Started Free
           </Button>
         </div>
       </div>
