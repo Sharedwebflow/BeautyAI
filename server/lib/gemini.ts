@@ -61,20 +61,19 @@ Provide the response in this exact JSON format:
 }`;
 
     console.log('Sending request to Gemini API');
-    const result = await model.generateContent([
-      {
-        role: "user",
+    const result = await model.generateContent({
+      contents: [{
         parts: [
           { text: prompt },
           {
-            inlineData: {
-              mimeType: "image/jpeg",
+            inline_data: {
+              mime_type: "image/jpeg",
               data: base64Image
             }
           }
         ]
-      }
-    ]);
+      }]
+    });
 
     const response = await result.response;
     const text = response.text();
