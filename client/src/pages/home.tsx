@@ -6,30 +6,50 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import LoadingAnalysis from "@/components/loading-analysis";
 import { Sparkles, Scan, Heart, Star } from "lucide-react";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [image, setImage] = useState<string | null>(null);
 
   const analyzeMutation = useMutation({
     mutationFn: async (base64Image: string) => {
       const response = await apiRequest("POST", "/api/analyze", { image: base64Image });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to analyze image");
+      }
       return response.json();
     },
     onSuccess: (data) => {
       setLocation(`/analysis/${data.id}`);
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      if (error.message === "Not authenticated") {
+        setLocation("/auth");
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     },
   });
+
+  const handleAnalyze = () => {
+    if (!user) {
+      setLocation("/auth");
+      return;
+    }
+    if (image) {
+      analyzeMutation.mutate(image);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
@@ -60,10 +80,10 @@ export default function Home() {
                 <Button
                   className="w-full mt-4"
                   size="lg"
-                  disabled={!image}
-                  onClick={() => image && analyzeMutation.mutate(image)}
+                  disabled={!image || !user}
+                  onClick={handleAnalyze}
                 >
-                  Analyze My Features
+                  {user ? "Analyze My Features" : "Login to Analyze"}
                 </Button>
               </>
             )}
@@ -156,9 +176,15 @@ export default function Home() {
           <Button
             size="lg"
             className="bg-primary hover:bg-primary/90"
-            onClick={() => document.querySelector('input[type="file"]')?.click()}
+            onClick={() => {
+              if (!user) {
+                setLocation("/auth");
+              } else {
+                document.querySelector('input[type="file"]')?.click();
+              }
+            }}
           >
-            Get Started Free
+            {user ? "Get Started Free" : "Login to Get Started"}
           </Button>
         </div>
       </div>
