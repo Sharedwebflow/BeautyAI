@@ -1,9 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-// We'll keep both imports ready, uncomment the one you want to use
-import { analyzeFacialFeatures as analyzeWithGemini } from "./lib/gemini";
-// import { analyzeFacialFeatures as analyzeWithOpenAI } from "./lib/openai";
+import { analyzeFacialFeatures } from "./lib/gemini";
 import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 
@@ -50,8 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Use Gemini by default, switch to OpenAI if preferred
-      const analysis = await analyzeWithGemini(image);
+      const analysis = await analyzeFacialFeatures(image);
       const validatedAnalysis = insertAnalysisSchema.parse({
         userId: req.user?.id || 1, // Use default user ID if not logged in
         imageUrl: `data:image/jpeg;base64,${image}`,
