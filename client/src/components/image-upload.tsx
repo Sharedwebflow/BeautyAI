@@ -15,34 +15,52 @@ interface ImageUploadProps {
 export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [isWebGLAvailable, setIsWebGLAvailable] = useState(true);
   const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+
+  // Check WebGL support
+  useEffect(() => {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    setIsWebGLAvailable(!!gl);
+  }, []);
 
   // Load face detection models
   useEffect(() => {
     const loadModels = async () => {
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        if (!isWebGLAvailable) {
+          // Load only TinyFaceDetector for CPU-only mode
+          await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        } else {
+          // Load full feature set for WebGL
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+          ]);
+        }
         setModelsLoaded(true);
       } catch (error) {
         console.error('Error loading face detection models:', error);
         toast({
-          title: "Error",
-          description: "Failed to initialize face detection. Please try again.",
-          variant: "destructive",
+          title: "Model Loading Error",
+          description: "Using basic image processing. Quality may be reduced.",
+          variant: "warning",
         });
+        // Still allow uploads even if model loading fails
+        setModelsLoaded(true);
       }
     };
     loadModels();
-  }, [toast]);
+  }, [isWebGLAvailable, toast]);
 
   const processImage = async (file: File) => {
     if (!modelsLoaded) {
       toast({
         title: "Please wait",
-        description: "Face detection is still initializing...",
+        description: "Image processing is initializing...",
       });
       return;
     }
@@ -58,11 +76,22 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         img.src = e.target.result as string;
         img.onload = async () => {
           try {
-            // Detect faces
-            const detections = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-              .withFaceLandmarks();
+            let detection;
+            if (isWebGLAvailable) {
+              // Full detection with landmarks
+              detection = await faceapi.detectSingleFace(
+                img, 
+                new faceapi.TinyFaceDetectorOptions()
+              ).withFaceLandmarks();
+            } else {
+              // Basic detection only
+              detection = await faceapi.detectSingleFace(
+                img, 
+                new faceapi.TinyFaceDetectorOptions()
+              );
+            }
 
-            if (!detections) {
+            if (!detection) {
               toast({
                 title: "No face detected",
                 description: "Please upload a clear photo of your face",
@@ -74,41 +103,49 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
 
             // Create canvas for cropping
             const canvas = document.createElement('canvas');
-            const box = detections.detection.box;
+            const box = detection.box || detection.detection.box;
 
             // Add padding around the face
             const padding = {
-              x: box.width * 0.4, // Increased padding to include more context
+              x: box.width * 0.4,
               y: box.height * 0.4
             };
 
-            canvas.width = box.width + (padding.x * 2);
-            canvas.height = box.height + (padding.y * 2);
+            // Ensure we don't exceed image boundaries
+            const cropX = Math.max(0, box.x - padding.x);
+            const cropY = Math.max(0, box.y - padding.y);
+            const cropWidth = Math.min(img.width - cropX, box.width + (padding.x * 2));
+            const cropHeight = Math.min(img.height - cropY, box.height + (padding.y * 2));
+
+            canvas.width = cropWidth;
+            canvas.height = cropHeight;
 
             const ctx = canvas.getContext('2d');
-            if (!ctx) return;
+            if (!ctx) {
+              throw new Error("Could not get canvas context");
+            }
 
             // Draw cropped face with padding
             ctx.drawImage(
               img,
-              Math.max(0, box.x - padding.x),
-              Math.max(0, box.y - padding.y),
-              box.width + (padding.x * 2),
-              box.height + (padding.y * 2),
+              cropX,
+              cropY,
+              cropWidth,
+              cropHeight,
               0,
               0,
               canvas.width,
               canvas.height
             );
 
-            // Convert to base64
+            // Convert to base64 with quality adjustment
             const base64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
             onChange(base64);
           } catch (error) {
             console.error('Face detection error:', error);
             toast({
-              title: "Error",
-              description: "Failed to process face detection. Please try a different photo.",
+              title: "Processing Error",
+              description: "Could not process the image. Please try a different photo.",
               variant: "destructive",
             });
           }
@@ -167,7 +204,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
           {!modelsLoaded ? (
             <div className="flex flex-col items-center space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              <p className="text-sm text-muted-foreground">Initializing face detection...</p>
+              <p className="text-sm text-muted-foreground">Initializing image processing...</p>
             </div>
           ) : isProcessing ? (
             <div className="flex flex-col items-center space-y-4">
@@ -182,6 +219,11 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
               <p className="text-sm text-muted-foreground">
                 Drag & drop your photo here, or click to select
               </p>
+              {!isWebGLAvailable && (
+                <p className="text-xs text-muted-foreground">
+                  Running in compatibility mode
+                </p>
+              )}
             </div>
           )}
         </div>
