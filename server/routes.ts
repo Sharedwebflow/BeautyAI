@@ -24,6 +24,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(product);
   });
 
+  app.post("/api/analyze", async (req, res) => {
+    try {
+      const { image } = req.body;
+      if (!image) {
+        res.status(400).json({ message: "Image is required" });
+        return;
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        res.status(500).json({ message: "Gemini API key is not configured" });
+        return;
+      }
+
+      // Log the image size for debugging
+      console.log(`Processing image of size: ${image.length} bytes`);
+
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/=]+$/.test(image)) {
+        res.status(400).json({ message: "Invalid image format. Please provide a valid base64 encoded image." });
+        return;
+      }
+
+      try {
+        const analysis = await analyzeFacialFeatures(image);
+        console.log('Analysis completed successfully');
+
+        const validatedAnalysis = insertAnalysisSchema.parse({
+          userId: req.user?.id || 1,
+          imageUrl: `data:image/jpeg;base64,${image}`,
+          features: analysis.features,
+          skinType: analysis.skinType,
+          concerns: analysis.concerns,
+          recommendations: analysis.recommendations
+        });
+
+        const savedAnalysis = await storage.createAnalysis(validatedAnalysis);
+        res.json(savedAnalysis);
+      } catch (analysisError) {
+        console.error('Analysis error:', analysisError);
+        res.status(500).json({ 
+          message: "Failed to analyze image. Please make sure the image contains a clear face and try again.",
+          details: analysisError instanceof Error ? analysisError.message : 'Unknown error'
+        });
+      }
+    } catch (error) {
+      console.error('Server error:', error);
+      res.status(500).json({ 
+        message: "An unexpected error occurred while processing your request",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   app.get("/api/analysis/:id/recommendations", async (req, res) => {
     try {
       const analysis = await storage.getAnalysis(Number(req.params.id));
@@ -34,32 +87,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const recommendedProducts = await storage.getRecommendedProducts(analysis);
       res.json(recommendedProducts);
-    } catch (error: unknown) {
-      const err = error as Error;
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/analyze", async (req, res) => {
-    try {
-      const { image } = req.body;
-      if (!image) {
-        res.status(400).json({ message: "Image is required" });
-        return;
-      }
-
-      const analysis = await analyzeFacialFeatures(image);
-      const validatedAnalysis = insertAnalysisSchema.parse({
-        userId: req.user?.id || 1, // Use default user ID if not logged in
-        imageUrl: `data:image/jpeg;base64,${image}`,
-        features: analysis.features,
-        skinType: analysis.skinType,
-        concerns: analysis.concerns,
-        recommendations: analysis.recommendations
-      });
-
-      const savedAnalysis = await storage.createAnalysis(validatedAnalysis);
-      res.json(savedAnalysis);
     } catch (error: unknown) {
       const err = error as Error;
       res.status(500).json({ message: err.message });

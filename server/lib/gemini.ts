@@ -26,39 +26,41 @@ export interface FacialAnalysis {
 
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
+    console.log('Initializing Gemini model');
     const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
 
-    const prompt = `Analyze this person's facial features and beauty characteristics in detail. 
-    Provide a comprehensive analysis including:
-    - Skin type and concerns
-    - Detailed feature analysis (eyes, lips, cheeks, jawline, forehead, nose shape, skin texture, facial symmetry)
-    - Product recommendations with specific ingredients
-    
-    Format the response as a JSON object with this structure:
-    {
-      "skinType": "...",
-      "concerns": ["...", "..."],
-      "features": {
-        "eyes": "...",
-        "lips": "...",
-        "cheeks": "...",
-        "jawline": "...",
-        "forehead": "...",
-        "noseShape": "...",
-        "skinTexture": "...",
-        "symmetry": "..."
-      },
-      "recommendations": [
-        {
-          "category": "...",
-          "productType": "...",
-          "reason": "...",
-          "priority": number,
-          "ingredients": ["...", "..."]
-        }
-      ]
-    }`;
+    const prompt = `As a professional beauty advisor and dermatologist, analyze this person's facial features and provide detailed recommendations. Focus on:
 
+1. Skin type and texture
+2. Facial feature analysis
+3. Product recommendations with specific ingredients
+
+Provide the response in this exact JSON format:
+{
+  "skinType": "combination/oily/dry/etc",
+  "concerns": ["concern1", "concern2"],
+  "features": {
+    "eyes": "description",
+    "lips": "description",
+    "cheeks": "description",
+    "jawline": "description",
+    "forehead": "description",
+    "noseShape": "description",
+    "skinTexture": "description",
+    "symmetry": "description"
+  },
+  "recommendations": [
+    {
+      "category": "category name",
+      "productType": "specific product type",
+      "reason": "why this product",
+      "priority": 1-5 number,
+      "ingredients": ["ingredient1", "ingredient2"]
+    }
+  ]
+}`;
+
+    console.log('Sending request to Gemini API');
     const result = await model.generateContent([
       prompt,
       {
@@ -71,17 +73,24 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
 
     const response = await result.response;
     const text = response.text();
-    
+    console.log('Received response from Gemini API');
+
     // Extract JSON from the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error("Could not extract JSON from response");
+      throw new Error("Could not extract JSON from Gemini response");
     }
-    
-    const analysisData = JSON.parse(jsonMatch[0]);
-    return analysisData as FacialAnalysis;
+
+    try {
+      const analysisData = JSON.parse(jsonMatch[0]);
+      console.log('Successfully parsed analysis data');
+      return analysisData as FacialAnalysis;
+    } catch (parseError) {
+      console.error('Failed to parse Gemini response:', parseError);
+      throw new Error("Invalid response format from Gemini API");
+    }
   } catch (error) {
-    const err = error as Error;
-    throw new Error(`Failed to analyze facial features: ${err.message}`);
+    console.error('Gemini API error:', error);
+    throw new Error(`Failed to analyze facial features: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
