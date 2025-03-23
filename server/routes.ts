@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { analyzeFacialFeatures } from "./lib/openai";
+// Switch to Gemini for now since OpenAI needs credits
+import { analyzeFacialFeatures } from "./lib/gemini";
 import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 
