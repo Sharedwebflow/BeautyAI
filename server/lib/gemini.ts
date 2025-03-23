@@ -27,7 +27,7 @@ export interface FacialAnalysis {
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
     console.log('Initializing Gemini model');
-    const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `As a professional beauty advisor and dermatologist, analyze this person's facial features and provide detailed recommendations. Focus on:
 
@@ -62,12 +62,17 @@ Provide the response in this exact JSON format:
 
     console.log('Sending request to Gemini API');
     const result = await model.generateContent([
-      prompt,
       {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Image
-        }
+        role: "user",
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image
+            }
+          }
+        ]
       }
     ]);
 
