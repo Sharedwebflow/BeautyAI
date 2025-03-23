@@ -29,11 +29,10 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
     console.log('Initializing Gemini model');
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `You are a professional beauty advisor and dermatologist. Analyze this person's facial features and provide detailed recommendations. 
-    Provide ONLY a valid JSON response with NO additional text, following this EXACT structure:
+    const prompt = `As a beauty advisor, analyze this facial image and respond with ONLY a JSON object in this exact format (no markdown, no extra text):
     {
-      "skinType": "specify skin type",
-      "concerns": ["list", "of", "concerns"],
+      "skinType": "normal/combination/oily/dry",
+      "concerns": ["concern1", "concern2"],
       "features": {
         "eyes": "description",
         "lips": "description",
@@ -46,9 +45,9 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
       },
       "recommendations": [
         {
-          "category": "category name",
-          "productType": "specific product type",
-          "reason": "why this product",
+          "category": "skincare/makeup",
+          "productType": "specific type",
+          "reason": "explanation",
           "priority": 1,
           "ingredients": ["ingredient1", "ingredient2"]
         }
@@ -74,30 +73,44 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
     const text = response.text();
     console.log('Received response from Gemini API');
 
-    try {
-      // Attempt to parse the entire response as JSON first
-      const analysisData = JSON.parse(text);
-      console.log('Successfully parsed analysis data');
-      return analysisData as FacialAnalysis;
-    } catch (parseError) {
-      console.error('Failed to parse direct JSON response, attempting to extract JSON:', parseError);
+    // Remove any markdown formatting and find JSON
+    const cleanText = text.replace(/```json\n|\n```|```/g, '');
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
 
-      // If direct parsing fails, try to extract JSON from the text
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Could not find JSON structure in Gemini response");
-      }
+    if (!jsonMatch) {
+      throw new Error("Could not find valid JSON in response");
+    }
 
-      try {
-        const extractedData = JSON.parse(jsonMatch[0]);
-        return extractedData as FacialAnalysis;
-      } catch (extractError) {
-        console.error('Failed to parse extracted JSON:', extractError);
-        throw new Error("Invalid JSON format in Gemini response");
+    const analysisData = JSON.parse(jsonMatch[0]);
+
+    // Validate the response structure
+    if (!analysisData.skinType || !analysisData.concerns || !analysisData.features || !analysisData.recommendations) {
+      throw new Error("Invalid response format: missing required fields");
+    }
+
+    // Ensure all required feature fields exist
+    const requiredFeatures = ['eyes', 'lips', 'cheeks', 'jawline', 'forehead', 'noseShape', 'skinTexture', 'symmetry'];
+    for (const feature of requiredFeatures) {
+      if (!analysisData.features[feature]) {
+        throw new Error(`Invalid response format: missing feature ${feature}`);
       }
     }
+
+    // Validate recommendations format
+    if (!Array.isArray(analysisData.recommendations) || analysisData.recommendations.length === 0) {
+      throw new Error("Invalid response format: recommendations must be a non-empty array");
+    }
+
+    for (const rec of analysisData.recommendations) {
+      if (!rec.category || !rec.productType || !rec.reason || !rec.priority || !Array.isArray(rec.ingredients)) {
+        throw new Error("Invalid response format: invalid recommendation structure");
+      }
+    }
+
+    console.log('Successfully validated analysis data');
+    return analysisData as FacialAnalysis;
   } catch (error) {
-    console.error('Gemini API error:', error);
+    console.error('Analysis error:', error);
     throw new Error(`Failed to analyze facial features: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
