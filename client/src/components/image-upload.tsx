@@ -1,9 +1,8 @@
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, UploadIcon, Camera, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { ImageIcon, UploadIcon } from "lucide-react";
 
 interface ImageUploadProps {
   value: string | null;
@@ -12,90 +11,6 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { toast } = useToast();
-
-  const startCamera = async () => {
-    setIsInitializingCamera(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-
-      // Make sure video element exists
-      if (!videoRef.current) {
-        throw new Error("Failed to initialize camera view");
-      }
-
-      // Set up video stream
-      videoRef.current.srcObject = stream;
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current?.play();
-        setIsCapturing(true);
-        setIsInitializingCamera(false);
-      };
-
-    } catch (err) {
-      console.error("Camera error:", err);
-      let message = "Failed to access camera. ";
-
-      if (err instanceof Error) {
-        if (err.name === "NotAllowedError") {
-          message = "Camera access was denied. Please check your browser permissions and try again.";
-        } else if (err.name === "NotFoundError") {
-          message = "No camera found on your device.";
-        } else if (err.name === "NotReadableError") {
-          message = "Your camera might be in use by another application.";
-        } else {
-          message += err.message;
-        }
-      }
-
-      toast({
-        title: "Camera Error",
-        description: message,
-        variant: "destructive",
-      });
-      setIsCapturing(false);
-      setIsInitializingCamera(false);
-    }
-  };
-
-  const stopCamera = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsCapturing(false);
-  }, []);
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    // Set canvas size to match video
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    // Capture the frame
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Convert to base64
-    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-    onChange(base64);
-    stopCamera();
-  };
-
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
@@ -117,15 +32,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       "image/*": [".jpeg", ".jpg", ".png"],
     },
     maxFiles: 1,
-    disabled: isCapturing || isInitializingCamera,
   });
-
-  // Cleanup camera on unmount
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera]);
 
   return (
     <Card
@@ -133,38 +40,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       className={`relative border-2 border-dashed cursor-pointer hover:border-primary/50 transition ${className}`}
     >
       <input {...getInputProps()} />
-      {isCapturing ? (
-        <div className="relative min-h-[300px]">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                capturePhoto();
-              }}
-              variant="secondary"
-            >
-              Take Photo
-            </Button>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                stopCamera();
-              }}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-          </div>
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
-      ) : value ? (
+      {value ? (
         <div className="relative min-h-[300px]">
           <img
             src={`data:image/jpeg;base64,${value}`}
@@ -174,14 +50,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center p-10 text-center">
-          {isInitializingCamera ? (
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Initializing camera...
-              </p>
-            </div>
-          ) : isDragActive ? (
+          {isDragActive ? (
             <UploadIcon className="h-10 w-10 text-muted-foreground mb-4" />
           ) : (
             <div className="space-y-4">
@@ -189,17 +58,6 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
               <p className="text-sm text-muted-foreground">
                 Drag & drop your photo here, or click to select
               </p>
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startCamera();
-                }}
-                variant="outline"
-                className="mx-auto"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Use Camera
-              </Button>
             </div>
           )}
         </div>
