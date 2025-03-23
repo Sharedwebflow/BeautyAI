@@ -77,6 +77,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/analysis/:id", async (req, res) => {
+    try {
+      const analysis = await storage.getAnalysis(Number(req.params.id));
+      if (!analysis) {
+        res.status(404).json({ message: "Analysis not found" });
+        return;
+      }
+      res.json(analysis);
+    } catch (error) {
+      console.error('Error fetching analysis:', error);
+      res.status(500).json({ message: "Failed to fetch analysis" });
+    }
+  });
+
   app.get("/api/analysis/:id/recommendations", async (req, res) => {
     try {
       const analysis = await storage.getAnalysis(Number(req.params.id));

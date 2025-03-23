@@ -13,6 +13,7 @@ export default function Analysis() {
 
   const analysisQuery = useQuery<Analysis>({
     queryKey: ["/api/analysis", id],
+    enabled: !!id
   });
 
   const productsQuery = useQuery<Product[]>({
@@ -28,7 +29,23 @@ export default function Analysis() {
     );
   }
 
-  if (!analysisQuery.data || !productsQuery.data) {
+  if (analysisQuery.isError) {
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Error Loading Analysis</h2>
+            <p className="text-muted-foreground">
+              {analysisQuery.error instanceof Error ? analysisQuery.error.message : "Failed to load analysis"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!analysisQuery.data) {
     return (
       <div className="container mx-auto px-4 py-16">
         <Card>
