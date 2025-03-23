@@ -6,10 +6,8 @@ import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication routes and middleware
   setupAuth(app);
 
-  // Product routes
   app.get("/api/products", async (_req, res) => {
     const products = await storage.getProducts();
     res.json(products);
@@ -27,28 +25,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/analyze", async (req, res) => {
     try {
       const { image } = req.body;
+
       if (!image) {
-        res.status(400).json({ message: "Image is required" });
-        return;
+        return res.status(400).json({ message: "Image is required" });
       }
 
       if (!process.env.GEMINI_API_KEY) {
-        res.status(500).json({ message: "Gemini API key is not configured" });
-        return;
+        return res.status(500).json({ message: "Gemini API key is not configured" });
       }
 
-      // Log the image size for debugging
       console.log(`Processing image of size: ${image.length} bytes`);
 
       // Validate base64 format
       if (!/^[A-Za-z0-9+/=]+$/.test(image)) {
-        res.status(400).json({ message: "Invalid image format. Please provide a valid base64 encoded image." });
-        return;
+        return res.status(400).json({ 
+          message: "Invalid image format. Please provide a valid base64 encoded image." 
+        });
       }
 
       try {
         const analysis = await analyzeFacialFeatures(image);
-        console.log('Analysis completed successfully');
+        console.log('Analysis completed, validating data');
 
         const validatedAnalysis = insertAnalysisSchema.parse({
           userId: req.user?.id || 1,
@@ -59,18 +56,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recommendations: analysis.recommendations
         });
 
+        console.log('Data validated, saving analysis');
         const savedAnalysis = await storage.createAnalysis(validatedAnalysis);
-        res.json(savedAnalysis);
+        return res.json(savedAnalysis);
+
       } catch (analysisError) {
         console.error('Analysis error:', analysisError);
-        res.status(500).json({ 
+        return res.status(500).json({ 
           message: "Failed to analyze image. Please make sure the image contains a clear face and try again.",
           details: analysisError instanceof Error ? analysisError.message : 'Unknown error'
         });
       }
     } catch (error) {
       console.error('Server error:', error);
-      res.status(500).json({ 
+      return res.status(500).json({ 
         message: "An unexpected error occurred while processing your request",
         details: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -79,15 +78,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analysis/:id", async (req, res) => {
     try {
-      const analysis = await storage.getAnalysis(Number(req.params.id));
-      if (!analysis) {
-        res.status(404).json({ message: "Analysis not found" });
-        return;
+      const analysisId = Number(req.params.id);
+      if (isNaN(analysisId)) {
+        return res.status(400).json({ message: "Invalid analysis ID" });
       }
-      res.json(analysis);
+
+      const analysis = await storage.getAnalysis(analysisId);
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+
+      return res.json(analysis);
     } catch (error) {
       console.error('Error fetching analysis:', error);
-      res.status(500).json({ message: "Failed to fetch analysis" });
+      return res.status(500).json({ message: "Failed to fetch analysis" });
     }
   });
 
