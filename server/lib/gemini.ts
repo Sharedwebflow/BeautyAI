@@ -28,7 +28,7 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
   try {
     console.log('Initializing Gemini model');
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-pro-vision",
+      model: "gemini-1.5-pro-vision",
       generationConfig: {
         temperature: 0.4,
         maxOutputTokens: 1024,
@@ -62,20 +62,23 @@ Return ONLY a JSON object with NO additional text, following this EXACT format:
   ]
 }`;
 
-    const result = await model.generateContent({
-      contents: [{
+    console.log('Sending request to Gemini API');
+    const result = await model.generateContent([
+      {
         role: "user",
         parts: [
-          { text: prompt },
           {
-            inline_data: {
-              mime_type: "image/jpeg",
+            text: prompt
+          },
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
               data: base64Image
             }
           }
         ]
-      }]
-    });
+      }
+    ]);
 
     const response = await result.response;
     const text = response.text();
