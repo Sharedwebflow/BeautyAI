@@ -25,30 +25,47 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
         throw new Error("Camera access not supported in this browser");
       }
 
+      // Explicitly request camera permissions with macOS/Safari compatible constraints
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
+        },
+        audio: false
       });
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        // Wait for the video to be ready
-        await new Promise((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = resolve;
-          }
-        });
-        await videoRef.current.play();
-        setIsCapturing(true);
+      if (!videoRef.current) {
+        throw new Error("Video element not found");
       }
+
+      videoRef.current.srcObject = stream;
+
+      // Wait for video to be ready
+      await new Promise<void>((resolve, reject) => {
+        if (!videoRef.current) return reject();
+        videoRef.current.onloadedmetadata = () => resolve();
+        videoRef.current.onerror = () => reject();
+      });
+
+      setIsCapturing(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
+      let errorMessage = "Unable to access camera. ";
+
+      if (err instanceof Error) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          errorMessage += "Please allow camera access in your browser settings and try again.";
+        } else if (err.name === "NotFoundError") {
+          errorMessage += "No camera found on your device.";
+        } else {
+          errorMessage += "Please check your camera permissions and try again.";
+        }
+      }
+
       toast({
         title: "Camera Access Error",
-        description: "Please make sure you've granted camera permissions and try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -66,24 +83,24 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   }, []);
 
   const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
+    if (!videoRef.current || !canvasRef.current) return;
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
 
-      const context = canvas.getContext('2d');
-      if (context) {
-        // Mirror effect for selfie
-        context.translate(canvas.width, 0);
-        context.scale(-1, 1);
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-        const base64 = canvas.toDataURL('image/jpeg').split(',')[1];
-        onChange(base64);
-        stopCamera();
-      }
+    const context = canvas.getContext('2d');
+    if (context) {
+      // Mirror effect for selfie
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+      onChange(base64);
+      stopCamera();
     }
   };
 
