@@ -107,7 +107,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     >
       <input {...getInputProps()} />
       {isCameraActive ? (
-        <div className="relative min-h-[300px] flex items-center justify-center">
+        <div className="relative min-h-[400px] flex items-center justify-center">
           <Webcam
             ref={webcamRef}
             audio={false}
@@ -117,7 +117,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
               height: 600,
               facingMode: "user"
             }}
-            className="w-full h-[300px] object-cover"
+            className="w-full h-[400px] object-cover"
             style={{ transform: 'scaleX(-1)' }}
           />
           <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
