@@ -29,7 +29,7 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
     console.log('Starting OpenAI analysis with base64 image...');
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision",
+      model: "gpt-4-vision-preview",
       messages: [
         {
           role: "user",
