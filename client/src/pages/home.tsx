@@ -56,7 +56,7 @@ export default function Home() {
         </div>
 
         {/* Upload Section */}
-        <Card className="max-w-xl mx-auto">
+        <Card className="max-w-xl mx-auto" data-section="upload">
           <CardContent className="p-6">
             {analyzeMutation.isPending ? (
               <LoadingAnalysis />
@@ -167,7 +167,8 @@ export default function Home() {
             size="lg"
             className="bg-primary hover:bg-primary/90"
             onClick={() => {
-              document.querySelector('input[type="file"]')?.click();
+              const uploadSection = document.querySelector('[data-section="upload"]');
+              uploadSection?.scrollIntoView({ behavior: 'smooth' });
             }}
           >
             Get Started Free
