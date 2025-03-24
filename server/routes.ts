@@ -25,6 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/analyze", async (req, res) => {
     try {
+      console.log('Received analyze request');
       const { image } = req.body;
 
       if (!image) {
@@ -32,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ message: "API configuration error" });
+        return res.status(500).json({ message: "OpenAI API key not configured" });
       }
 
       // Validate base64 format
@@ -45,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         console.log('Starting facial analysis...');
         const analysis = await analyzeFacialFeatures(image);
-        console.log('Analysis completed, validating response...');
+        console.log('Analysis completed successfully');
 
         try {
           const validatedAnalysis = insertAnalysisSchema.parse({
@@ -63,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (validationError instanceof z.ZodError) {
             return res.status(400).json({
               message: "Invalid analysis data format",
-              details: validationError.errors.map(err => err.message)
+              details: validationError.errors
             });
           }
           throw validationError;
@@ -72,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (analysisError) {
         console.error('Analysis error:', analysisError);
         return res.status(500).json({ 
-          message: "Unable to analyze your photo right now. Please try again with a clear photo of your face.",
+          message: analysisError instanceof Error ? analysisError.message : "Analysis failed. Please try again.",
           code: 500
         });
       }

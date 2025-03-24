@@ -26,44 +26,17 @@ export interface FacialAnalysis {
 
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
-    console.log('Starting OpenAI analysis...');
+    console.log('Starting OpenAI analysis with base64 image...');
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision",
+      model: "gpt-4-vision-preview",
       messages: [
-        {
-          role: "system",
-          content: `You are a professional dermatologist and beauty advisor. Analyze facial features and provide beauty recommendations. 
-          Format your response EXACTLY as a JSON object with no additional text.`
-        },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: `Analyze this facial image and provide a detailed skin assessment. Return the analysis in this exact JSON format:
-              {
-                "skinType": "dry/oily/combination/normal",
-                "concerns": ["specific skin concerns"],
-                "features": {
-                  "moisture": "hydration level description",
-                  "acne": "breakout assessment",
-                  "darkSpots": "pigmentation analysis",
-                  "pores": "pore condition",
-                  "wrinkles": "fine lines assessment",
-                  "texture": "texture description",
-                  "redness": "inflammation analysis",
-                  "elasticity": "firmness assessment"
-                },
-                "recommendations": [
-                  {
-                    "category": "skincare/treatment",
-                    "productType": "specific product type",
-                    "reason": "why this is recommended",
-                    "priority": 1-5 (1 being highest),
-                    "ingredients": ["key beneficial ingredients"]
-                  }
-                ]
-              }`
+              text: "You are a dermatologist. Analyze this facial image and provide a detailed skin assessment. Return ONLY a JSON object with NO additional text in this exact format: {\"skinType\": \"dry/oily/combination/normal\", \"concerns\": [\"list concerns\"], \"features\": {\"moisture\": \"description\", \"acne\": \"description\", \"darkSpots\": \"description\", \"pores\": \"description\", \"wrinkles\": \"description\", \"texture\": \"description\", \"redness\": \"description\", \"elasticity\": \"description\"}, \"recommendations\": [{\"category\": \"type\", \"productType\": \"specific product\", \"reason\": \"why needed\", \"priority\": 1, \"ingredients\": [\"key ingredients\"]}]}",
             },
             {
               type: "image_url",
@@ -74,28 +47,33 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
           ]
         }
       ],
-      max_tokens: 1500,
-      temperature: 0.7,
+      max_tokens: 4096,
+      temperature: 0.5,
       response_format: { type: "json_object" }
     });
+
+    console.log('OpenAI API response received');
 
     const result = response.choices[0].message.content;
     if (!result) {
       throw new Error("No analysis generated");
     }
 
-    console.log('OpenAI response received:', result);
-
+    console.log('Parsing response...');
     const analysisData = JSON.parse(result);
 
-    // Validate response structure
+    // Simple validation
     if (!analysisData.skinType || !analysisData.concerns || !analysisData.features || !analysisData.recommendations) {
+      console.error('Invalid response structure:', analysisData);
       throw new Error("Invalid response format: missing required fields");
     }
 
     return analysisData as FacialAnalysis;
   } catch (error) {
     console.error('OpenAI API error:', error);
-    throw new Error('Failed to analyze facial features. Please try again with a clear photo.');
+    if (error instanceof Error) {
+      throw new Error(`Analysis failed: ${error.message}`);
+    }
+    throw new Error('Failed to analyze facial features. Please try again.');
   }
 }
