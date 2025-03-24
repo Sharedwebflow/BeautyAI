@@ -26,11 +26,11 @@ export interface FacialAnalysis {
 
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
-    // Initialize the model
-    const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+    // Initialize the model with the latest version
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-vision" });
 
-    // The prompt that specifies the format we want
-    const prompt = `Analyze this facial image and provide a skin assessment.
+    // Create the prompt for skin analysis
+    const prompt = `Analyze this facial image and provide a detailed skin assessment.
 Return ONLY a JSON object with NO additional text, following this EXACT format:
 
 {
@@ -57,38 +57,39 @@ Return ONLY a JSON object with NO additional text, following this EXACT format:
   ]
 }`;
 
-    // Generate content
+    // Make the API request exactly as shown in documentation
     const result = await model.generateContent([
-      prompt,
       {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Image
-        }
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image
+            }
+          }
+        ]
       }
     ]);
 
-    // Wait for the response
+    // Get the response
     const response = await result.response;
     const text = response.text();
-    console.log('Raw response:', text);
+    console.log('Raw Gemini response:', text);
 
     try {
-      // Parse the response
+      // Parse and validate the response
       const analysisData = JSON.parse(text);
 
-      // Validate required fields
-      const requiredFields = ['skinType', 'concerns', 'features', 'recommendations'];
-      for (const field of requiredFields) {
-        if (!analysisData[field]) {
-          throw new Error(`Missing required field: ${field}`);
-        }
+      // Basic validation of required fields
+      if (!analysisData.skinType || !analysisData.concerns || !analysisData.features || !analysisData.recommendations) {
+        throw new Error("Missing required fields in analysis response");
       }
 
       return analysisData as FacialAnalysis;
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', parseError);
-      throw new Error('Invalid response format from Gemini API');
+      throw new Error("Failed to parse analysis result. Please try again.");
     }
   } catch (error) {
     console.error('Gemini API error:', error);
