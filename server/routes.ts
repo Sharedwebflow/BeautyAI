@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { analyzeFacialFeatures } from "./lib/gemini";
+import { analyzeFacialFeatures } from "./lib/openai";
 import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 import { z } from "zod";
@@ -31,7 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Please upload an image to analyze" });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
+      if (!process.env.OPENAI_API_KEY) {
         return res.status(500).json({ message: "API configuration error" });
       }
 
@@ -71,12 +71,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } catch (analysisError) {
         console.error('Analysis error:', analysisError);
-        const technicalError = analysisError instanceof Error ? analysisError.message : 'Unknown error';
-        const userMessage = "The image analysis failed. Please try uploading a clear photo of your face.";
-        
-        console.error('Analysis error:', analysisError);
         return res.status(500).json({ 
-          message: "Unable to analyze your photo right now. Please try again in a few moments",
+          message: "Unable to analyze your photo right now. Please try again with a clear photo of your face.",
           code: 500
         });
       }
