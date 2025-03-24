@@ -1,6 +1,7 @@
 import { useCallback, useState, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ImageIcon, UploadIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
