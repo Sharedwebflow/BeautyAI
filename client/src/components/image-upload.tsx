@@ -152,7 +152,13 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
             ref={videoRef}
             autoPlay
             playsInline
-            style={{ width: '100%', height: '300px', objectFit: 'cover' }}
+            muted
+            style={{
+              width: '100%',
+              height: '300px',
+              objectFit: 'cover',
+              transform: 'scaleX(-1)'
+            }}
           />
           <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
             <Button
@@ -194,7 +200,13 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
                 <p className="text-sm text-muted-foreground">
                   Drag & drop your photo here, or click to select
                 </p>
-                <Button variant="outline" onClick={startCamera}>
+                <Button
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startCamera();
+                  }}
+                >
                   Open Camera
                 </Button>
               </div>
