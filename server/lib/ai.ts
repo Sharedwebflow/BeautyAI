@@ -26,12 +26,14 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
   try {
     console.log('Starting Ollama analysis with base64 image...');
 
-    const ollama = new Ollama();
-    
+    const ollama = new Ollama({
+      host: 'http://localhost:11434'
+    });
+
     const prompt = `Analyze this facial image and provide a detailed skin assessment. Return ONLY a JSON object with NO additional text in this exact format: {"skinType": "dry/oily/combination/normal", "concerns": ["list concerns"], "features": {"moisture": "description", "acne": "description", "darkSpots": "description", "pores": "description", "wrinkles": "description", "texture": "description", "redness": "description", "elasticity": "description"}, "recommendations": [{"category": "type", "productType": "specific product", "reason": "why needed", "priority": 1, "ingredients": ["key ingredients"]}]}`;
 
     const response = await ollama.chat({
-      model: 'llama2-mini',
+      model: 'o1',
       messages: [
         {
           role: 'user',
@@ -41,8 +43,8 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
               text: prompt
             },
             {
-              type: 'image_url',
-              image_url: `data:image/jpeg;base64,${base64Image}`
+              type: 'image',
+              data: base64Image
             }
           ]
         }
