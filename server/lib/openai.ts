@@ -26,8 +26,9 @@ export interface FacialAnalysis {
 
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
+    console.log('Starting OpenAI analysis...');
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4-vision",
       messages: [
         {
           role: "system",
@@ -82,6 +83,8 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
     if (!result) {
       throw new Error("No analysis generated");
     }
+
+    console.log('OpenAI response received:', result);
 
     const analysisData = JSON.parse(result);
 
