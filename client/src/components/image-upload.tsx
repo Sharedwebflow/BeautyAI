@@ -147,12 +147,12 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     >
       <input {...getInputProps()} />
       {isCameraActive ? (
-        <div className="relative min-h-[300px]">
+        <div className="relative min-h-[300px] flex items-center justify-center">
           <video
             ref={videoRef}
             autoPlay
             playsInline
-            className="w-full h-full object-cover"
+            style={{ width: '100%', height: '300px', objectFit: 'cover' }}
           />
           <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
             <Button
