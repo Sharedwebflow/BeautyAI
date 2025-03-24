@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { analyzeFacialFeatures } from "./lib/ai";
+import { analyzeFacialFeatures } from "./lib/openai";
 import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 import { z } from "zod";
@@ -32,12 +32,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Please upload an image to analyze" });
       }
 
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ message: "OpenAI API key not configured" });
+      }
+
       // Validate base64 format
       if (!/^[A-Za-z0-9+/=]+$/.test(image)) {
+        console.error('Invalid base64 format received');
         return res.status(400).json({ 
           message: "Invalid image format. Please ensure you're uploading a valid image." 
         });
       }
+
+      console.log('Image validation passed, starting analysis...');
 
       try {
         console.log('Starting facial analysis...');
@@ -45,6 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Analysis completed successfully');
 
         try {
+          console.log('Validating analysis results...');
           const validatedAnalysis = insertAnalysisSchema.parse({
             userId: req.user?.id || 1,
             imageUrl: `data:image/jpeg;base64,${image}`,

@@ -28,6 +28,13 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
   try {
     console.log('Starting OpenAI analysis with base64 image...');
 
+    // Ensure the base64 image is properly formatted
+    const formattedImageUrl = base64Image.startsWith('data:image') 
+      ? base64Image 
+      : `data:image/jpeg;base64,${base64Image}`;
+
+    console.log('Preparing OpenAI API request...');
+
     const response = await openai.chat.completions.create({
       model: "gpt-4-vision-preview",
       messages: [
@@ -41,7 +48,7 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`
+                url: formattedImageUrl
               }
             }
           ]
@@ -56,10 +63,11 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
 
     const result = response.choices[0].message.content;
     if (!result) {
+      console.error('No content in OpenAI response');
       throw new Error("No analysis generated");
     }
 
-    console.log('Parsing response...');
+    console.log('Parsing OpenAI response...');
     const analysisData = JSON.parse(result);
 
     // Simple validation
