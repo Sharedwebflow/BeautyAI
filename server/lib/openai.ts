@@ -29,14 +29,14 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
     console.log('Starting OpenAI analysis with base64 image...');
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4-vision",
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "You are a dermatologist. Analyze this facial image and provide a detailed skin assessment. Return ONLY a JSON object with NO additional text in this exact format: {\"skinType\": \"dry/oily/combination/normal\", \"concerns\": [\"list concerns\"], \"features\": {\"moisture\": \"description\", \"acne\": \"description\", \"darkSpots\": \"description\", \"pores\": \"description\", \"wrinkles\": \"description\", \"texture\": \"description\", \"redness\": \"description\", \"elasticity\": \"description\"}, \"recommendations\": [{\"category\": \"type\", \"productType\": \"specific product\", \"reason\": \"why needed\", \"priority\": 1, \"ingredients\": [\"key ingredients\"]}]}",
+              text: "As a dermatologist, analyze this facial image and provide a detailed skin assessment. Return ONLY a JSON object with NO additional text in this exact format: {\"skinType\": \"dry/oily/combination/normal\", \"concerns\": [\"list concerns\"], \"features\": {\"moisture\": \"description\", \"acne\": \"description\", \"darkSpots\": \"description\", \"pores\": \"description\", \"wrinkles\": \"description\", \"texture\": \"description\", \"redness\": \"description\", \"elasticity\": \"description\"}, \"recommendations\": [{\"category\": \"type\", \"productType\": \"specific product\", \"reason\": \"why needed\", \"priority\": 1, \"ingredients\": [\"key ingredients\"]}]}"
             },
             {
               type: "image_url",
