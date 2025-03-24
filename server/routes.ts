@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { analyzeFacialFeatures } from "./lib/openai";
+import { analyzeFacialFeatures } from "./lib/ai";
 import { insertAnalysisSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
 import { z } from "zod";
@@ -30,10 +30,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!image) {
         return res.status(400).json({ message: "Please upload an image to analyze" });
-      }
-
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ message: "OpenAI API key not configured" });
       }
 
       // Validate base64 format
