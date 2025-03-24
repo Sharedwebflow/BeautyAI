@@ -41,28 +41,20 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const technicalMessage = err.message || "Internal Server Error";
+    console.error(`Error ${status}:`, err);
     
-    let simplifiedMessage = "Something went wrong";
-    if (status === 400) {
-      simplifiedMessage = "The request wasn't formatted correctly";
-    } else if (status === 401) {
-      simplifiedMessage = "You need to log in first";
-    } else if (status === 403) {
-      simplifiedMessage = "You don't have permission to do this";
-    } else if (status === 404) {
-      simplifiedMessage = "We couldn't find what you were looking for";
-    }
+    const messages = {
+      400: "Please check your input and try again",
+      401: "Please log in to continue",
+      403: "You don't have permission to do this",
+      404: "We couldn't find what you were looking for",
+      500: "Something went wrong on our end. Please try again later"
+    };
 
     res.status(status).json({
-      message: simplifiedMessage,
-      technical_details: technicalMessage,
-      error_code: status
+      message: messages[status as keyof typeof messages] || "An unexpected error occurred",
+      code: status
     });
-    
-    if (status >= 500) {
-      throw err;
-    }
   });
 
   if (app.get("env") === "development") {

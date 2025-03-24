@@ -74,10 +74,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const technicalError = analysisError instanceof Error ? analysisError.message : 'Unknown error';
         const userMessage = "The image analysis failed. Please try uploading a clear photo of your face.";
         
+        console.error('Analysis error:', analysisError);
         return res.status(500).json({ 
-          message: userMessage,
-          technical_details: technicalError,
-          simplified_error: "There was a problem with the AI service that analyzes your photo. This might be temporary - please try again in a few moments."
+          message: "Unable to analyze your photo right now. Please try again in a few moments",
+          code: 500
         });
       }
     } catch (error) {
