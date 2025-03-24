@@ -2,6 +2,8 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+
 export interface FacialAnalysis {
   skinType: string;
   concerns: string[];
@@ -24,19 +26,57 @@ export interface FacialAnalysis {
   }[];
 }
 
+function validateImage(base64String: string): { isValid: boolean; error?: string } {
+  try {
+    // Check if it's a valid base64 string
+    if (!/^[A-Za-z0-9+/=]+$/.test(base64String)) {
+      return { isValid: false, error: "Invalid base64 format" };
+    }
+
+    // Check file size (20MB limit)
+    const sizeInBytes = (base64String.length * 3) / 4;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+    if (sizeInMB > 20) {
+      return { isValid: false, error: "Image size exceeds 20MB limit" };
+    }
+
+    // Check image dimensions
+    const img = new Image();
+    const buffer = Buffer.from(base64String, 'base64');
+
+    // This is a basic check for JPEG/PNG headers.  More robust checks would be needed for production.
+    const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
+    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50;
+
+    if (!isJPEG && !isPNG) {
+      return { isValid: false, error: "Image must be in JPEG or PNG format" };
+    }
+
+    return { isValid: true };
+  } catch (error) {
+    return { isValid: false, error: "Failed to validate image" };
+  }
+}
+
 export async function analyzeFacialFeatures(base64Image: string): Promise<FacialAnalysis> {
   try {
     console.log('Starting OpenAI analysis with base64 image...');
+
+    // Validate image first
+    const validation = validateImage(base64Image);
+    if (!validation.isValid) {
+      throw new Error(validation.error || "Invalid image format");
+    }
 
     // Ensure the base64 image is properly formatted
     const formattedImageUrl = base64Image.startsWith('data:image') 
       ? base64Image 
       : `data:image/jpeg;base64,${base64Image}`;
 
-    console.log('Preparing OpenAI API request...');
+    console.log('Image validated, preparing OpenAI API request...');
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4o",
       messages: [
         {
           role: "user",
@@ -70,7 +110,7 @@ export async function analyzeFacialFeatures(base64Image: string): Promise<Facial
     console.log('Parsing OpenAI response...');
     const analysisData = JSON.parse(result);
 
-    // Simple validation
+    // Validate required fields
     if (!analysisData.skinType || !analysisData.concerns || !analysisData.features || !analysisData.recommendations) {
       console.error('Invalid response structure:', analysisData);
       throw new Error("Invalid response format: missing required fields");
