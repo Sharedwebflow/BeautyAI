@@ -1,5 +1,6 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useDropzone } from "react-dropzone";
+import Webcam from "react-webcam";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ImageIcon, UploadIcon } from "lucide-react";
@@ -14,54 +15,25 @@ interface ImageUploadProps {
 export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const webcamRef = useRef<Webcam>(null);
   const { toast } = useToast();
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsCameraActive(true);
-      }
-    } catch (err) {
-      toast({
-        title: "Camera Error",
-        description: "Unable to access camera. Please check permissions.",
-        variant: "destructive",
-      });
-    }
+  const startCamera = () => {
+    setIsCameraActive(true);
   };
 
   const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      setIsCameraActive(false);
-    }
+    setIsCameraActive(false);
   };
 
-  const capturePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        onChange(dataUrl.split(',')[1]);
-        stopCamera();
-      }
-    }
-  };
-
-  useEffect(() => {
-    return () => {
+  const capturePhoto = useCallback(() => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      // Remove the data:image/jpeg;base64, prefix
+      onChange(imageSrc.split(',')[1]);
       stopCamera();
-    };
-  }, []);
+    }
+  }, [webcamRef, onChange]);
 
   const processImage = async (file: File) => {
     setIsProcessing(true);
@@ -88,14 +60,12 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
           let width = img.width;
           let height = img.height;
 
-          if (width > MAX_SIZE || height > MAX_SIZE) {
-            if (width > height) {
-              height = Math.round((height * MAX_SIZE) / width);
-              width = MAX_SIZE;
-            } else {
-              width = Math.round((width * MAX_SIZE) / height);
-              height = MAX_SIZE;
-            }
+          if (width > height && width > MAX_SIZE) {
+            height = (height * MAX_SIZE) / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width = (width * MAX_SIZE) / height;
+            height = MAX_SIZE;
           }
 
           canvas.width = width;
@@ -103,17 +73,16 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
 
           // Draw and compress image
           ctx.drawImage(img, 0, 0, width, height);
-          const base64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
-          onChange(base64);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          onChange(compressedBase64.split(',')[1]);
         };
       };
-
       reader.readAsDataURL(file);
-    } catch (error) {
-      console.error('Error processing image:', error);
+    } catch (err) {
+      console.error('Error processing image:', err);
       toast({
         title: "Error",
-        description: "Failed to process image. Please try again.",
+        description: "Failed to process image",
         variant: "destructive",
       });
     } finally {
@@ -121,23 +90,14 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     }
   };
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      const file = acceptedFiles[0];
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: { 'image/*': [] },
+    maxFiles: 1,
+    onDrop: async ([file]) => {
       if (file) {
-        processImage(file);
+        await processImage(file);
       }
     },
-    [onChange, toast]
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/*": [".jpeg", ".jpg", ".png"],
-    },
-    maxFiles: 1,
-    disabled: isProcessing,
   });
 
   return (
@@ -147,28 +107,35 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     >
       <input {...getInputProps()} />
       {isCameraActive ? (
-        <div className="relative min-h-[300px] flex items-center justify-center overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{
-              transform: 'scaleX(-1)',
-              zIndex: 10
+        <div className="relative min-h-[300px] flex items-center justify-center">
+          <Webcam
+            ref={webcamRef}
+            audio={false}
+            screenshotFormat="image/jpeg"
+            videoConstraints={{
+              width: 800,
+              height: 600,
+              facingMode: "user"
             }}
+            className="w-full h-[300px] object-cover"
+            style={{ transform: 'scaleX(-1)' }}
           />
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2" style={{ zIndex: 20 }}>
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
             <Button
               variant="secondary"
-              onClick={stopCamera}
+              onClick={(e) => {
+                e.stopPropagation();
+                stopCamera();
+              }}
               className="bg-white/80 hover:bg-white"
             >
               Cancel
             </Button>
             <Button
-              onClick={capturePhoto}
+              onClick={(e) => {
+                e.stopPropagation();
+                capturePhoto();
+              }}
               className="bg-primary/80 hover:bg-primary"
             >
               Take Photo
