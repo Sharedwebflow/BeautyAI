@@ -12,7 +12,55 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsCameraActive(true);
+      }
+    } catch (err) {
+      toast({
+        title: "Camera Error",
+        description: "Unable to access camera. Please check permissions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      setIsCameraActive(false);
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        onChange(dataUrl.split(',')[1]);
+        stopCamera();
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const processImage = async (file: File) => {
     setIsProcessing(true);
@@ -97,7 +145,31 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       className={`relative border-2 border-dashed cursor-pointer hover:border-primary/50 transition ${className}`}
     >
       <input {...getInputProps()} />
-      {value ? (
+      {isCameraActive ? (
+        <div className="relative min-h-[300px]">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={stopCamera}
+              className="bg-white/80 hover:bg-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={capturePhoto}
+              className="bg-primary/80 hover:bg-primary"
+            >
+              Take Photo
+            </Button>
+          </div>
+        </div>
+      ) : value ? (
         <div className="relative min-h-[300px]">
           <img
             src={`data:image/jpeg;base64,${value}`}
@@ -116,10 +188,15 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
             <UploadIcon className="h-10 w-10 text-muted-foreground mb-4" />
           ) : (
             <div className="space-y-4">
-              <ImageIcon className="h-10 w-10 text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">
-                Drag & drop your photo here, or click to select
-              </p>
+              <div className="flex flex-col items-center gap-4">
+                <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Drag & drop your photo here, or click to select
+                </p>
+                <Button variant="outline" onClick={startCamera}>
+                  Open Camera
+                </Button>
+              </div>
             </div>
           )}
         </div>
