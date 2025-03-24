@@ -41,10 +41,28 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const technicalMessage = err.message || "Internal Server Error";
+    
+    let simplifiedMessage = "Something went wrong";
+    if (status === 400) {
+      simplifiedMessage = "The request wasn't formatted correctly";
+    } else if (status === 401) {
+      simplifiedMessage = "You need to log in first";
+    } else if (status === 403) {
+      simplifiedMessage = "You don't have permission to do this";
+    } else if (status === 404) {
+      simplifiedMessage = "We couldn't find what you were looking for";
+    }
 
-    res.status(status).json({ message });
-    throw err;
+    res.status(status).json({
+      message: simplifiedMessage,
+      technical_details: technicalMessage,
+      error_code: status
+    });
+    
+    if (status >= 500) {
+      throw err;
+    }
   });
 
   if (app.get("env") === "development") {
