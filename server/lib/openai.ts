@@ -40,18 +40,6 @@ function validateImage(base64String: string): { isValid: boolean; error?: string
       return { isValid: false, error: "Image size exceeds 20MB limit" };
     }
 
-    // Check image dimensions
-    const img = new Image();
-    const buffer = Buffer.from(base64String, 'base64');
-
-    // This is a basic check for JPEG/PNG headers.  More robust checks would be needed for production.
-    const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
-    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50;
-
-    if (!isJPEG && !isPNG) {
-      return { isValid: false, error: "Image must be in JPEG or PNG format" };
-    }
-
     return { isValid: true };
   } catch (error) {
     return { isValid: false, error: "Failed to validate image" };

@@ -29,60 +29,96 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
   const capturePhoto = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
-      // Remove the data:image/jpeg;base64, prefix
-      onChange(imageSrc.split(',')[1]);
+      processImage(dataURLtoFile(imageSrc, 'webcam-photo.jpg'));
       stopCamera();
     }
   }, [webcamRef, onChange]);
 
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
   const processImage = async (file: File) => {
     setIsProcessing(true);
     try {
+      // Create a new image element
+      const img = new Image();
       const reader = new FileReader();
-      reader.onload = async (e) => {
-        if (!e.target?.result) return;
 
-        // Create an image element to check dimensions and compress if needed
-        const img = new Image();
-        img.src = e.target.result as string;
-
+      reader.onload = () => {
+        img.src = reader.result as string;
         img.onload = () => {
-          // Create canvas for potential resizing and compression
+          // Create canvas for resizing
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-
           if (!ctx) {
             throw new Error("Could not get canvas context");
           }
 
-          // Set maximum dimensions while maintaining aspect ratio
-          const MAX_SIZE = 800;
-          let width = img.width;
-          let height = img.height;
+          // Calculate new dimensions while maintaining aspect ratio
+          let { width, height } = img;
+          const MAX_SIZE = 2048;
+          const MIN_SIZE = 512;
 
-          if (width > height && width > MAX_SIZE) {
-            height = (height * MAX_SIZE) / width;
-            width = MAX_SIZE;
-          } else if (height > MAX_SIZE) {
-            width = (width * MAX_SIZE) / height;
-            height = MAX_SIZE;
+          // Scale down if larger than max size
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) {
+              height = (height * MAX_SIZE) / width;
+              width = MAX_SIZE;
+            } else {
+              width = (width * MAX_SIZE) / height;
+              height = MAX_SIZE;
+            }
           }
 
+          // Scale up if smaller than min size
+          if (width < MIN_SIZE || height < MIN_SIZE) {
+            if (width < height) {
+              height = (height * MIN_SIZE) / width;
+              width = MIN_SIZE;
+            } else {
+              width = (width * MIN_SIZE) / height;
+              height = MIN_SIZE;
+            }
+          }
+
+          // Set canvas dimensions
           canvas.width = width;
           canvas.height = height;
 
           // Draw and compress image
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-          onChange(compressedBase64.split(',')[1]);
+
+          // Convert to JPEG format with quality adjustment
+          let quality = 0.95;
+          let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+
+          // Reduce quality if size is too large (20MB limit)
+          while (compressedBase64.length * 0.75 > 20 * 1024 * 1024 && quality > 0.5) {
+            quality -= 0.05;
+            compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          }
+
+          // Extract base64 data (remove data:image/jpeg;base64, prefix)
+          const base64Data = compressedBase64.split(',')[1];
+          onChange(base64Data);
         };
       };
+
       reader.readAsDataURL(file);
     } catch (err) {
       console.error('Error processing image:', err);
       toast({
         title: "Error",
-        description: "Failed to process image",
+        description: "Failed to process image. Please try again with a different photo.",
         variant: "destructive",
       });
     } finally {
@@ -113,8 +149,8 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
             audio={false}
             screenshotFormat="image/jpeg"
             videoConstraints={{
-              width: 800,
-              height: 600,
+              width: 1280,
+              height: 720,
               facingMode: "user"
             }}
             className="w-full h-[400px] object-cover"
